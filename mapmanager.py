@@ -1,7 +1,7 @@
 class MapManager():
     def __init__(self):
-        self.model = 'block.egg'
-        self.texture = 'block.png'
+        self.model = 'asset/block.egg'
+        self.texture = 'asset/block.png'
         self.startNew()
 
     def startNew(self):

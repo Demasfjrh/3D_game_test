@@ -1,5 +1,6 @@
 from direct.showbase.ShowBase import ShowBase
-from panda3d.core import Vec3, WindowProperties, CollisionTraverser, CollisionNode, CollisionHandlerPusher, CollisionSphere
+from panda3d.core import Vec3, WindowProperties, CollisionTraverser, CollisionNode, CollisionHandlerPusher, CollisionSphere, NodePath
+from direct.actor.Actor import Actor 
 from mapmanager import MapManager
 
 class Game(ShowBase):
@@ -10,8 +11,6 @@ class Game(ShowBase):
         self.land.loadLand("asset/land.txt")
 
         self.disableMouse()
-        self.camera.setPos(5, -5, 10)
-        self.camera.lookAt(5, 5, 0)
 
         # Mouse settings
         props = WindowProperties()
@@ -23,28 +22,35 @@ class Game(ShowBase):
         self.centerY = int(self.win.getProperties().getYSize() / 2)
         self.win.movePointer(0, self.centerX, self.centerY)
 
-        self.camLens.setFov(100)
+        self.camLens.setFov(100)  # Perbesar FOV kalau terlalu sempit
 
-        # Input Key Setup
+        # Input
         self.keys = {"w": False, "a": False, "s": False, "d": False, "space": False}
         for key in self.keys:
             self.accept(key, self.setKey, [key, True])
             self.accept(f"{key}-up", self.setKey, [key, False])
 
-        # Mouse Movement
         self.mouseSensitivity = 0.2
         self.pitch = 0
         self.yaw = 0
 
-        # Gerakan
+        # Buat player model (bisa diganti model sendiri)
+        self.player = loader.loadModel("models/box")  # Ganti dengan model karakter kamu
+        self.player.setScale(1, 1, 2)
+        self.player.setPos(5, 5, 2)
+        self.player.reparentTo(render)
+
+        # Kamera ditempel ke player (first-person offset)
+        self.camera.reparentTo(self.player)
+        self.camera.setPos(0, 0, 1.5)
+
+        # Physics
         self.velocity = Vec3(0, 0, 0)
         self.speed = 8
         self.gravity = -25
         self.jumpSpeed = 10
-        self.isJumping = False
         self.onGround = False
 
-        # Collision sphere
         self.initCollision()
 
         self.taskMgr.add(self.update, "update")
@@ -58,9 +64,9 @@ class Game(ShowBase):
 
         self.colliderNode = CollisionNode("player")
         self.colliderNode.addSolid(CollisionSphere(0, 0, 1, 1))
-        self.collider = self.camera.attachNewNode(self.colliderNode)
+        self.collider = self.player.attachNewNode(self.colliderNode)
 
-        self.pusher.addCollider(self.collider, self.camera)
+        self.pusher.addCollider(self.collider, self.player)
         base.cTrav.addCollider(self.collider, self.pusher)
 
     def update(self, task):
@@ -76,17 +82,17 @@ class Game(ShowBase):
             dy = (y - self.centerY) * self.mouseSensitivity
 
             self.yaw -= dx
-            self.pitch -= dy  # NEGATIF agar tidak terbalik ke atas-bawah
+            self.pitch -= dy
             self.pitch = clamp(self.pitch, -89, 89)
 
-            self.camera.setH(self.yaw)
+            self.player.setH(self.yaw)
             self.camera.setP(self.pitch)
 
-            self.win.movePointer(0, self.centerX, self.centerY)  # Reset ke tengah
+            self.win.movePointer(0, self.centerX, self.centerY)
 
         # Gerakan
         moveVec = Vec3(0, 0, 0)
-        quat = self.camera.getQuat(render)
+        quat = self.player.getQuat(render)
 
         if self.keys["w"]:
             moveVec += quat.getForward()
@@ -112,8 +118,8 @@ class Game(ShowBase):
             self.velocity.setZ(self.jumpSpeed)
             self.onGround = False
 
-        # Posisi baru
-        newPos = self.camera.getPos() + self.velocity * dt
+        # Update Posisi
+        newPos = self.player.getPos() + self.velocity * dt
         if newPos.getZ() <= 2:
             newPos.setZ(2)
             self.velocity.setZ(0)
@@ -121,10 +127,10 @@ class Game(ShowBase):
         else:
             self.onGround = False
 
-        self.camera.setPos(newPos)
+        self.player.setPos(newPos)
         return task.cont
 
-# Clamp helper
+# Helper clamp
 def clamp(value, minVal, maxVal):
     return max(min(value, maxVal), minVal)
 
